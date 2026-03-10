@@ -144,9 +144,7 @@ export default function Index() {
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <BookOpen className="h-4 w-4 text-primary-foreground" />
-            </div>
+<img src="/pda.png" alt="PDA Simulator" className="w-8 h-8 rounded-lg object-cover" />
             <div>
               <h1 className="text-base font-bold tracking-tight text-foreground">PDA Simulator</h1>
               <p className="text-[10px] text-muted-foreground">Pushdown Automata — Interactive Learning Tool</p>
