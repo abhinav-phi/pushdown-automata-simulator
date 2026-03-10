@@ -1,0 +1,144 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 97%;
+    --foreground: 220 25% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 10%;
+
+    --primary: 168 80% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 20% 93%;
+    --secondary-foreground: 220 25% 20%;
+
+    --muted: 220 15% 94%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 38 92% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 168 80% 36%;
+
+    --radius: 0.75rem;
+
+    --state-active: 168 80% 36%;
+    --state-accept: 142 70% 45%;
+    --state-reject: 0 72% 51%;
+    --stack-cell: 210 40% 96%;
+    --stack-border: 220 15% 80%;
+    --stack-top: 168 80% 90%;
+    --log-bg: 220 20% 98%;
+    --log-step: 220 15% 94%;
+
+    --font-display: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 220 25% 8%;
+    --foreground: 220 15% 90%;
+    --card: 220 25% 12%;
+    --card-foreground: 220 15% 90%;
+    --popover: 220 25% 12%;
+    --popover-foreground: 220 15% 90%;
+    --primary: 168 70% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 220 15% 85%;
+    --muted: 220 20% 16%;
+    --muted-foreground: 220 10% 55%;
+    --accent: 38 92% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 20% 20%;
+    --input: 220 20% 20%;
+    --ring: 168 70% 42%;
+    --stack-cell: 220 25% 14%;
+    --stack-border: 220 20% 25%;
+    --stack-top: 168 70% 20%;
+    --log-bg: 220 25% 10%;
+    --log-step: 220 20% 14%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-display);
+  }
+  code, .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+@layer components {
+  .panel-card {
+    @apply bg-card rounded-xl border shadow-sm p-4;
+  }
+  .panel-title {
+    @apply text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3;
+  }
+  .stack-cell {
+    @apply px-4 py-2 text-center font-mono text-sm font-semibold border border-stack-border;
+    background: hsl(var(--stack-cell));
+  }
+  .stack-cell-top {
+    background: hsl(var(--stack-top));
+    @apply border-primary;
+  }
+  .state-node {
+    @apply w-10 h-10 rounded-full border-2 flex items-center justify-center text-xs font-semibold;
+  }
+  .state-active {
+    @apply border-primary bg-primary/10 text-primary;
+  }
+  .log-row {
+    @apply px-3 py-2 text-xs font-mono rounded;
+    background: hsl(var(--log-step));
+  }
+  .sim-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  .sim-badge-accepted {
+    @apply bg-state-accept/15 text-state-accept;
+  }
+  .sim-badge-rejected {
+    @apply bg-state-reject/15 text-state-reject;
+  }
+}
