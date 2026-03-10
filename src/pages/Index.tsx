@@ -180,7 +180,7 @@ export default function Index() {
     </div>
 
     {/* CENTER: State Diagram only */}
-    <div className="lg:col-span-4">
+    <div className="lg:col-span-4 h-full">
       <StateDiagram definition={definition} currentState={currentState} />
     </div>
 
