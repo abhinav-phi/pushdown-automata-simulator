@@ -139,7 +139,7 @@ export default function StateDiagram({ definition, currentState }: Props) {
   return (
     <div className="panel-card">
       <h2 className="panel-title">State Diagram</h2>
-      <div ref={containerRef} className="w-full h-[600px] bg-card rounded-lg border" />
+      <div ref={containerRef} className="w-full h-[400px] bg-card rounded-lg border" />
       <div className="flex gap-4 mt-2 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-sm border-2 border-muted-foreground inline-block" /> State
