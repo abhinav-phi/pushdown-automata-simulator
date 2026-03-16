@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { BookOpen } from 'lucide-react';
 
 const emptyDefinition: PDADefinition = {
   states: [],
@@ -33,7 +32,6 @@ export default function Index() {
   const [definition, setDefinition] = useState<PDADefinition>({ ...emptyDefinition });
   const [inputString, setInputString] = useState('');
 
-  // Simulation state
   const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [steps, setSteps] = useState<SimulationStep[]>([]);
@@ -64,7 +62,6 @@ export default function Index() {
     const gen = simulateStepByStep(definition, inputString);
     generatorRef.current = gen;
 
-    // Get initial step
     const first = gen.next();
     if (!first.done) {
       const step = first.value as SimulationStep;
@@ -144,7 +141,7 @@ export default function Index() {
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-<img src="/pda.png" alt="PDA Simulator" className="w-8 h-8 rounded-lg object-cover" />
+            <img src="/pda.png" alt="PDA Simulator" className="w-8 h-8 rounded-lg object-cover" />
             <div>
               <h1 className="text-base font-bold tracking-tight text-foreground">PDA Simulator</h1>
               <p className="text-[10px] text-muted-foreground">Pushdown Automata — Interactive Learning Tool</p>
@@ -168,41 +165,41 @@ export default function Index() {
         </div>
       </header>
 
-{/* Main Layout */}
-<main className="container mx-auto px-4 py-4">
-  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      {/* Main Layout */}
+      <main className="container mx-auto px-4 py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
 
-    {/* LEFT: PDA Definition only */}
-    <div className="lg:col-span-4 space-y-4">
-      <PDADefinitionPanel definition={definition} onChange={setDefinition} />
+          {/* LEFT: PDA Definition + Input Testing */}
+          <div className="lg:col-span-4 space-y-4">
+            <PDADefinitionPanel definition={definition} onChange={setDefinition} />
+            <InputTestingPanel definition={definition} />
+          </div>
+
+          {/* CENTER: State Diagram */}
+          <div className="lg:col-span-4">
+            <StateDiagram definition={definition} currentState={currentState} />
+          </div>
+
+          {/* RIGHT: Stack + Simulation + Execution Log */}
+          <div className="lg:col-span-4 space-y-4">
+            <StackVisualization stack={currentStack} />
+            <SimulationControls
+              inputString={inputString}
+              onInputChange={setInputString}
+              onStart={handleStart}
+              onStep={handleStep}
+              onRunAuto={handleRunAuto}
+              onReset={handleReset}
+              isRunning={isRunning}
+              isFinished={isFinished}
+              currentState={currentState || '—'}
+              remainingInput={remainingInput}
+            />
+            <ExecutionLog steps={steps} result={simResult} />
+          </div>
+
+        </div>
+      </main>
     </div>
-
-    {/* CENTER: State Diagram only */}
-    <div className="lg:col-span-4 h-full">
-      <StateDiagram definition={definition} currentState={currentState} />
-    </div>
-
-    {/* RIGHT: Stack + Simulation + Execution Log + Input Testing */}
-    <div className="lg:col-span-4 space-y-4">
-      <StackVisualization stack={currentStack} />
-      <SimulationControls
-        inputString={inputString}
-        onInputChange={setInputString}
-        onStart={handleStart}
-        onStep={handleStep}
-        onRunAuto={handleRunAuto}
-        onReset={handleReset}
-        isRunning={isRunning}
-        isFinished={isFinished}
-        currentState={currentState || '—'}
-        remainingInput={remainingInput}
-      />
-      <ExecutionLog steps={steps} result={simResult} />
-      <InputTestingPanel definition={definition} />
-    </div>
-
-  </div>
-</main>
-</div>
   );
 }
