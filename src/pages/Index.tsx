@@ -8,13 +8,9 @@ import StateDiagram from '@/components/StateDiagram';
 import SimulationControls from '@/components/SimulationControls';
 import ExecutionLog from '@/components/ExecutionLog';
 import InputTestingPanel from '@/components/InputTestingPanel';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import AppHeader from '@/components/AppHeader';
+import AppFooter from '@/components/AppFooter';
+import { useTheme } from '@/hooks/useTheme';
 import { toast } from 'sonner';
 
 const emptyDefinition: PDADefinition = {
@@ -29,9 +25,9 @@ const emptyDefinition: PDADefinition = {
 };
 
 export default function Index() {
+  const { theme, toggleTheme } = useTheme();
   const [definition, setDefinition] = useState<PDADefinition>({ ...emptyDefinition });
   const [inputString, setInputString] = useState('');
-
   const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [steps, setSteps] = useState<SimulationStep[]>([]);
@@ -54,14 +50,9 @@ export default function Index() {
 
   const handleStart = useCallback(() => {
     const errors = validatePDA(definition);
-    if (errors.length > 0) {
-      errors.forEach(e => toast.error(e));
-      return;
-    }
-
+    if (errors.length > 0) { errors.forEach(e => toast.error(e)); return; }
     const gen = simulateStepByStep(definition, inputString);
     generatorRef.current = gen;
-
     const first = gen.next();
     if (!first.done) {
       const step = first.value as SimulationStep;
@@ -70,7 +61,6 @@ export default function Index() {
       setCurrentState(step.currentState);
       setRemainingInput(step.remainingInput);
     }
-
     setIsRunning(true);
     setIsFinished(false);
     setSimResult(null);
@@ -78,13 +68,10 @@ export default function Index() {
 
   const handleStep = useCallback(() => {
     if (!generatorRef.current) return;
-
     const next = generatorRef.current.next();
     if (next.done) {
       const result = next.value as SimulationResult | undefined;
-      if (result) {
-        setSimResult({ accepted: result.accepted, reason: result.reason });
-      }
+      if (result) setSimResult({ accepted: result.accepted, reason: result.reason });
       setIsFinished(true);
     } else {
       const step = next.value as SimulationStep;
@@ -97,24 +84,18 @@ export default function Index() {
 
   const handleRunAuto = useCallback(() => {
     if (!generatorRef.current) return;
-
     const allSteps: SimulationStep[] = [];
-
     while (true) {
       const next = generatorRef.current.next();
       if (next.done) {
         const result = next.value as SimulationResult | undefined;
-        if (result) {
-          setSimResult({ accepted: result.accepted, reason: result.reason });
-        }
+        if (result) setSimResult({ accepted: result.accepted, reason: result.reason });
         setIsFinished(true);
         break;
       } else {
-        const step = next.value as SimulationStep;
-        allSteps.push(step);
+        allSteps.push(next.value as SimulationStep);
       }
     }
-
     if (allSteps.length > 0) {
       setSteps(prev => [...prev, ...allSteps]);
       const last = allSteps[allSteps.length - 1];
@@ -136,51 +117,26 @@ export default function Index() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <img src="/pda.png" alt="PDA Simulator" className="w-8 h-8 rounded-lg object-cover" />
-            <div>
-              <h1 className="text-base font-bold tracking-tight text-foreground">PDA Simulator</h1>
-              <p className="text-[10px] text-muted-foreground">Pushdown Automata — Interactive Learning Tool</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Load example:</span>
-            <Select onValueChange={loadExample}>
-              <SelectTrigger className="h-8 w-48 text-xs">
-                <SelectValue placeholder="Choose preset..." />
-              </SelectTrigger>
-              <SelectContent>
-                {predefinedExamples.map(ex => (
-                  <SelectItem key={ex.name} value={ex.name}>
-                    {ex.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background flex flex-col">
 
-      {/* Main Layout */}
-      <main className="container mx-auto px-4 py-4">
+      <AppHeader
+        theme={theme}
+        toggleTheme={toggleTheme}
+        onLoadExample={loadExample}
+      />
+
+      <main className="container mx-auto px-4 py-4 flex-1">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
 
-          {/* LEFT: PDA Definition + Input Testing */}
           <div className="lg:col-span-4 space-y-4">
             <PDADefinitionPanel definition={definition} onChange={setDefinition} />
             <InputTestingPanel definition={definition} />
           </div>
 
-          {/* CENTER: State Diagram */}
           <div className="lg:col-span-4">
             <StateDiagram definition={definition} currentState={currentState} />
           </div>
 
-          {/* RIGHT: Stack + Simulation + Execution Log */}
           <div className="lg:col-span-4 space-y-4">
             <StackVisualization stack={currentStack} />
             <SimulationControls
@@ -200,6 +156,9 @@ export default function Index() {
 
         </div>
       </main>
+
+      <AppFooter />
+
     </div>
   );
 }
