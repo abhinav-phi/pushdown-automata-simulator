@@ -6,7 +6,7 @@ const id = () => `t${nextId++}`;
 export const predefinedExamples: PDAExample[] = [
   {
     name: 'Language aⁿbⁿ',
-    description: 'Accepts strings with equal number of a\'s followed by b\'s (e.g., ab, aabb, aaabbb)',
+    description: "Accepts strings with equal number of a's followed by b's",
     definition: {
       states: ['q0', 'q1', 'q2'],
       inputAlphabet: ['a', 'b'],
@@ -27,7 +27,7 @@ export const predefinedExamples: PDAExample[] = [
   },
   {
     name: 'Balanced Parentheses',
-    description: 'Accepts strings with balanced parentheses (e.g., (), (()), (()()))',
+    description: 'Accepts strings with balanced parentheses',
     definition: {
       states: ['q0', 'q1'],
       inputAlphabet: ['(', ')'],
@@ -63,10 +63,8 @@ export const predefinedExamples: PDAExample[] = [
         { id: id(), currentState: 'q0', inputSymbol: 'a', stackTop: 'B', nextState: 'q0', stackOperation: 'AB' },
         { id: id(), currentState: 'q0', inputSymbol: 'b', stackTop: 'A', nextState: 'q0', stackOperation: 'BA' },
         { id: id(), currentState: 'q0', inputSymbol: 'b', stackTop: 'B', nextState: 'q0', stackOperation: 'BB' },
-        // Nondeterministic guess: switch to matching mode
         { id: id(), currentState: 'q0', inputSymbol: EPSILON, stackTop: 'A', nextState: 'q1', stackOperation: 'A' },
         { id: id(), currentState: 'q0', inputSymbol: EPSILON, stackTop: 'B', nextState: 'q1', stackOperation: 'B' },
-        // Match second half
         { id: id(), currentState: 'q1', inputSymbol: 'a', stackTop: 'A', nextState: 'q1', stackOperation: EPSILON },
         { id: id(), currentState: 'q1', inputSymbol: 'b', stackTop: 'B', nextState: 'q1', stackOperation: EPSILON },
         { id: id(), currentState: 'q1', inputSymbol: EPSILON, stackTop: 'Z', nextState: 'q2', stackOperation: 'Z' },
@@ -76,7 +74,7 @@ export const predefinedExamples: PDAExample[] = [
   },
   {
     name: 'Language 0ⁿ1ⁿ',
-    description: 'Accepts strings with equal number of 0\'s followed by 1\'s',
+    description: "Accepts strings with equal number of 0's followed by 1's",
     definition: {
       states: ['q0', 'q1', 'q2'],
       inputAlphabet: ['0', '1'],
