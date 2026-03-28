@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, KeyboardEvent } from 'react';
 import { usePDA } from '@/hooks/use-pda';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Trash2, Sparkles, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle } from 'lucide-react';
 import {
   ExponentRow,
   ConditionRow,
   generatePDAFromLanguage,
+  generatePDAFromRegex,  
   generateSmallestString,
   buildLanguageDescription,
   parseLanguageString,
@@ -128,16 +129,45 @@ export default function LanguageInputPanel() {
     }
   }, [exponents, conditions, setDefinition, setTestInput, startAndRunAll]);
 
+  // const handleRegexGenerate = useCallback(() => {
+  //   setError(null);
+  //   setSuccess(false);
+
+  //   const parsed = parseLanguageString(regexInput);
+  //   if (typeof parsed === 'string') {
+  //     setError(parsed);
+  //     return;
+  //   }
+
+  //   const result = generatePDAFromLanguage(parsed);
+  //   if (typeof result === 'string') {
+  //     setError(result);
+  //   } else {
+  //     setDefinition(result);
+  //     setExponents(parsed.exponents);
+  //     setConditions(parsed.conditions);
+  //     setSuccess(true);
+  //     setTimeout(() => setSuccess(false), 2000);
+  //     const smallest = generateSmallestString(parsed);
+  //     if (smallest) {
+  //       setTestInput(smallest);
+  //       startAndRunAll(smallest, result);
+  //     }
+  //   }
+  // }, [regexInput, setDefinition, setTestInput, startAndRunAll]);
   const handleRegexGenerate = useCallback(() => {
-    setError(null);
-    setSuccess(false);
+  setError(null);
+  setSuccess(false);
 
-    const parsed = parseLanguageString(regexInput);
-    if (typeof parsed === 'string') {
-      setError(parsed);
-      return;
-    }
+  if (!regexInput.trim()) {
+    setError('Enter a regex pattern');
+    return;
+  }
 
+  // Pehle try karo exponent pattern (a^n b^n style)
+  const parsed = parseLanguageString(regexInput);
+  if (typeof parsed !== 'string') {
+    // Exponent pattern mila
     const result = generatePDAFromLanguage(parsed);
     if (typeof result === 'string') {
       setError(result);
@@ -153,7 +183,21 @@ export default function LanguageInputPanel() {
         startAndRunAll(smallest, result);
       }
     }
-  }, [regexInput, setDefinition, setTestInput, startAndRunAll]);
+    return;
+  }
+
+  // Exponent pattern nahi mila — try regex (a+b)*c style
+  const result = generatePDAFromRegex(regexInput);
+  if (typeof result === 'string') {
+    setError(result);
+  } else {
+    setDefinition(result);
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 2000);
+    // Regex ke liye test input manually set karo
+    setTestInput('');
+  }
+}, [regexInput, setDefinition, setTestInput, startAndRunAll]);
 
   return (
     <div className="panel">
@@ -269,7 +313,7 @@ export default function LanguageInputPanel() {
             onClick={handleGenerate}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            <Sparkles className="w-3.5 h-3.5" /> Generate PDA
+           Generate PDA
           </button>
         </TabsContent>
 
@@ -292,7 +336,7 @@ export default function LanguageInputPanel() {
             onClick={handleRegexGenerate}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            <Sparkles className="w-3.5 h-3.5" /> Generate PDA
+           Generate PDA
           </button>
         </TabsContent>
       </Tabs>
