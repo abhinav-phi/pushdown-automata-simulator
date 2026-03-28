@@ -1,254 +1,215 @@
 import { PDADefinition, PDATransition, SimulationStep, SimulationResult, EPSILON } from './pda-types';
 
-export function findTransitions(
-  definition: PDADefinition,
-  state: string,
-  inputSymbol: string,
-  stackTop: string
-): PDATransition[] {
-  return definition.transitions.filter(t =>
-    t.currentState === state &&
-    (t.inputSymbol === inputSymbol || t.inputSymbol === EPSILON) &&
-    (t.stackTop === stackTop || t.stackTop === EPSILON)
-  );
-}
+const MAX_STEPS = 1000;
 
-function applyStackOperation(stack: string[], transition: PDATransition): string[] {
-  const newStack = [...stack];
-  if (transition.stackTop !== EPSILON && newStack.length > 0) {
-    newStack.pop();
-  }
-  if (transition.stackOperation !== EPSILON) {
-    const symbols = transition.stackOperation.split('').reverse();
-    for (const sym of symbols) {
-      newStack.push(sym);
-    }
-  }
-  return newStack;
-}
-
-function describeStackOp(transition: PDATransition): string {
-  if (transition.stackTop === EPSILON && transition.stackOperation === EPSILON) return 'No stack change';
-  if (transition.stackOperation === EPSILON) return `Pop ${transition.stackTop}`;
-  if (transition.stackTop === EPSILON) return `Push ${transition.stackOperation}`;
-  if (transition.stackOperation === transition.stackTop) return `Keep ${transition.stackTop}`;
-  return `Replace ${transition.stackTop} → ${transition.stackOperation}`;
-}
-
-interface Config {
+interface Configuration {
   state: string;
   inputPos: number;
   stack: string[];
   steps: SimulationStep[];
 }
 
-function runDFS(definition: PDADefinition, input: string): SimulationResult {
-  const initialStack = [definition.initialStackSymbol];
+function findTransitions(
+  def: PDADefinition,
+  state: string,
+  inputChar: string | null,
+  stackTop: string | undefined
+): PDATransition[] {
+  return def.transitions.filter(t => {
+    if (t.currentState !== state) return false;
+    const matchInput = t.inputSymbol === EPSILON
+      ? true
+      : t.inputSymbol === inputChar;
+    const matchStack = stackTop === undefined
+      ? false
+      : t.stackTop === stackTop;
+    if (t.inputSymbol !== EPSILON && inputChar === null) return false;
+    return matchInput && matchStack;
+  });
+}
+
+function applyTransition(
+  stack: string[],
+  transition: PDATransition
+): { newStack: string[]; operation: SimulationStep['stackOperation']; symbol: string } {
+  const newStack = [...stack];
+  // Pop the stack top (we matched it)
+  const popped = newStack.pop() || '';
+
+  if (transition.stackOperation === EPSILON) {
+    // Just pop, don't push anything back
+    return { newStack, operation: 'POP', symbol: popped };
+  }
+
+  // Push the stack operation string (right-to-left so first char ends on top)
+  const symbols = transition.stackOperation.split('');
+  for (let i = symbols.length - 1; i >= 0; i--) {
+    newStack.push(symbols[i]);
+  }
+
+  if (transition.stackOperation === popped) {
+    // Same symbol pushed back = no change
+    if (transition.inputSymbol === EPSILON) {
+      return { newStack, operation: 'EPSILON', symbol: '' };
+    }
+    return { newStack, operation: 'NO_OP', symbol: '' };
+  }
+
+  if (transition.stackOperation.length > 1) {
+    // Replaced top with multiple = push
+    return { newStack, operation: 'PUSH', symbol: symbols[0] };
+  }
+
+  if (symbols.length === 1 && symbols[0] !== popped) {
+    return { newStack, operation: 'REPLACE', symbol: symbols[0] };
+  }
+
+  return { newStack, operation: 'PUSH', symbol: symbols[0] };
+}
+
+export function simulatePDA(def: PDADefinition, input: string): SimulationResult {
+  const steps = Array.from(simulateStepByStep(def, input));
+  const lastStep = steps[steps.length - 1];
+
+  if (!lastStep) {
+    return { accepted: false, steps: [], reason: 'No steps generated' };
+  }
+
+  // Check the result from the generator
+  const accepted = checkAcceptance(def, lastStep);
+  const reason = accepted
+    ? def.acceptanceMode === 'finalState'
+      ? `Accepted — reached accept state ${lastStep.currentState}`
+      : 'Accepted — stack is empty'
+    : lastStep.remainingInput.length > 0
+      ? `Rejected — input not fully consumed (remaining: ${lastStep.remainingInput})`
+      : def.acceptanceMode === 'finalState'
+        ? `Rejected — state ${lastStep.currentState} is not an accept state`
+        : 'Rejected — stack is not empty';
+
+  return { accepted, steps, reason };
+}
+
+function checkAcceptance(def: PDADefinition, step: SimulationStep): boolean {
+  if (step.remainingInput.length > 0) return false;
+  if (def.acceptanceMode === 'finalState') {
+    return def.acceptStates.includes(step.currentState);
+  }
+  return step.stackContents.length === 0;
+}
+
+export function* simulateStepByStep(
+  def: PDADefinition,
+  input: string
+): Generator<SimulationStep> {
+  // Use DFS with backtracking for nondeterminism
+  const initialStack = [def.initialStackSymbol];
   const initialStep: SimulationStep = {
     stepNumber: 0,
-    currentState: definition.initialState,
+    currentState: def.initialState,
     remainingInput: input,
     stackContents: [...initialStack],
     transitionApplied: null,
-    stackOperation: 'Initial configuration',
+    stackOperation: 'NO_OP',
+    stackSymbol: '',
   };
 
-  const queue: Config[] = [{
-    state: definition.initialState,
-    inputPos: 0,
-    stack: [...initialStack],
-    steps: [initialStep],
-  }];
+  // Try DFS to find accepting path
+  const result = dfs(def, input, 0, def.initialState, initialStack, [initialStep], 0);
 
-  const visited = new Set<string>();
-  const maxSteps = 1000;
-  let iterations = 0;
-
-  while (queue.length > 0 && iterations < maxSteps) {
-    iterations++;
-    const config = queue.pop()!;
-    const configKey = `${config.state}|${config.inputPos}|${config.stack.join(',')}`;
-    if (visited.has(configKey)) continue;
-    visited.add(configKey);
-
-    const inputConsumed = config.inputPos >= input.length;
-
-    if (definition.acceptanceMode === 'finalState') {
-      if (inputConsumed && definition.acceptStates.includes(config.state)) {
-        return { accepted: true, steps: config.steps, reason: 'Accepted by final state' };
-      }
-    } else {
-      if (inputConsumed && config.stack.length === 0) {
-        return { accepted: true, steps: config.steps, reason: 'Accepted by empty stack' };
-      }
+  if (result) {
+    for (const step of result) {
+      yield step;
     }
+  } else {
+    // No accepting path found, just yield initial step
+    yield initialStep;
+  }
+}
 
-    const currentInput = inputConsumed ? EPSILON : input[config.inputPos];
-    const stackTop = config.stack.length > 0 ? config.stack[config.stack.length - 1] : EPSILON;
+function dfs(
+  def: PDADefinition,
+  fullInput: string,
+  inputPos: number,
+  state: string,
+  stack: string[],
+  pathSoFar: SimulationStep[],
+  depth: number
+): SimulationStep[] | null {
+  if (depth > MAX_STEPS) return null;
 
-    const inputTransitions = !inputConsumed
-      ? definition.transitions.filter(t =>
-          t.currentState === config.state &&
-          t.inputSymbol === currentInput &&
-          (t.stackTop === stackTop || t.stackTop === EPSILON)
-        )
-      : [];
+  const remainingInput = fullInput.substring(inputPos);
+  const lastStep = pathSoFar[pathSoFar.length - 1];
 
-    const epsilonTransitions = definition.transitions.filter(t =>
-      t.currentState === config.state &&
-      t.inputSymbol === EPSILON &&
-      (t.stackTop === stackTop || t.stackTop === EPSILON)
-    );
-
-    const allTransitions = [
-      ...inputTransitions.map(t => ({ transition: t, consumeInput: true })),
-      ...epsilonTransitions.map(t => ({ transition: t, consumeInput: false })),
-    ];
-
-    for (const { transition, consumeInput } of allTransitions) {
-      const newStack = applyStackOperation(config.stack, transition);
-      const newInputPos = consumeInput ? config.inputPos + 1 : config.inputPos;
-      const step: SimulationStep = {
-        stepNumber: config.steps.length,
-        currentState: transition.nextState,
-        remainingInput: input.slice(newInputPos),
-        stackContents: [...newStack],
-        transitionApplied: transition,
-        stackOperation: describeStackOp(transition),
-      };
-      queue.push({
-        state: transition.nextState,
-        inputPos: newInputPos,
-        stack: newStack,
-        steps: [...config.steps, step],
-      });
+  // Check if we've accepted
+  if (inputPos >= fullInput.length) {
+    if (def.acceptanceMode === 'finalState' && def.acceptStates.includes(state)) {
+      return pathSoFar;
+    }
+    if (def.acceptanceMode === 'emptyStack' && stack.length === 0) {
+      return pathSoFar;
     }
   }
 
-  return {
-    accepted: false,
-    steps: [initialStep],
-    reason: iterations >= maxSteps ? 'Exceeded maximum steps' : 'No accepting configuration found',
-  };
-}
+  const stackTop = stack.length > 0 ? stack[stack.length - 1] : undefined;
+  const inputChar = inputPos < fullInput.length ? fullInput[inputPos] : null;
 
-export function simulatePDA(definition: PDADefinition, input: string): SimulationResult {
-  return runDFS(definition, input);
+  // Try epsilon transitions first
+  const epsilonTransitions = findTransitions(def, state, null, stackTop)
+    .filter(t => t.inputSymbol === EPSILON);
+
+  for (const t of epsilonTransitions) {
+    const { newStack, operation, symbol } = applyTransition(stack, t);
+    const newStep: SimulationStep = {
+      stepNumber: pathSoFar.length,
+      currentState: t.nextState,
+      remainingInput: fullInput.substring(inputPos),
+      stackContents: [...newStack],
+      transitionApplied: t,
+      stackOperation: operation,
+      stackSymbol: symbol,
+    };
+    const result = dfs(def, fullInput, inputPos, t.nextState, newStack, [...pathSoFar, newStep], depth + 1);
+    if (result) return result;
+  }
+
+  // Try input-consuming transitions
+  if (inputChar !== null) {
+    const inputTransitions = findTransitions(def, state, inputChar, stackTop)
+      .filter(t => t.inputSymbol !== EPSILON);
+
+    for (const t of inputTransitions) {
+      const { newStack, operation, symbol } = applyTransition(stack, t);
+      const newStep: SimulationStep = {
+        stepNumber: pathSoFar.length,
+        currentState: t.nextState,
+        remainingInput: fullInput.substring(inputPos + 1),
+        stackContents: [...newStack],
+        transitionApplied: t,
+        stackOperation: operation,
+        stackSymbol: symbol,
+      };
+      const result = dfs(def, fullInput, inputPos + 1, t.nextState, newStack, [...pathSoFar, newStep], depth + 1);
+      if (result) return result;
+    }
+  }
+
+  // No accepting path from here — if at end of input, return current path for rejection info
+  if (inputPos >= fullInput.length && stack.length > 0) {
+    return pathSoFar;
+  }
+
+  return null;
 }
 
 export function validatePDA(def: PDADefinition): string[] {
   const errors: string[] = [];
   if (def.states.length === 0) errors.push('At least one state is required');
-  if (!def.initialState) errors.push('Initial state is required');
-  if (!def.initialStackSymbol) errors.push('Initial stack symbol is required');
-  if (!def.states.includes(def.initialState)) errors.push('Initial state must be in the states list');
-  if (def.acceptanceMode === 'finalState' && def.acceptStates.length === 0) {
-    errors.push('At least one accept state is required for final state acceptance');
+  if (!def.initialState) errors.push('Initial state must be set');
+  if (!def.states.includes(def.initialState)) errors.push('Initial state must be in states list');
+  for (const s of def.acceptStates) {
+    if (!def.states.includes(s)) errors.push(`Accept state ${s} not in states list`);
   }
-  for (const as of def.acceptStates) {
-    if (!def.states.includes(as)) errors.push(`Accept state "${as}" is not in the states list`);
-  }
-  for (const t of def.transitions) {
-    if (!def.states.includes(t.currentState)) errors.push(`Transition source "${t.currentState}" not in states`);
-    if (!def.states.includes(t.nextState)) errors.push(`Transition target "${t.nextState}" not in states`);
-  }
+  if (!def.initialStackSymbol) errors.push('Initial stack symbol required');
   return errors;
-}
-
-/**
- * Step-by-step simulation using DFS with backtracking (nondeterministic)
- */
-export function* simulateStepByStep(
-  definition: PDADefinition,
-  input: string
-): Generator<SimulationStep, SimulationResult, void> {
-  const initialStack = [definition.initialStackSymbol];
-  const initialStep: SimulationStep = {
-    stepNumber: 0,
-    currentState: definition.initialState,
-    remainingInput: input,
-    stackContents: [...initialStack],
-    transitionApplied: null,
-    stackOperation: 'Initial configuration',
-  };
-
-  yield initialStep;
-
-  // Run full DFS to find accepting path
-  const result = runDFS(definition, input);
-
-  if (result.accepted) {
-    // Yield the accepting path steps (skip step 0, already yielded)
-    for (let i = 1; i < result.steps.length; i++) {
-      yield result.steps[i];
-    }
-    return { accepted: true, steps: result.steps, reason: result.reason };
-  }
-
-  // Not accepted — yield a few steps to show attempt, then reject
-  const initialConfig: Config = {
-    state: definition.initialState,
-    inputPos: 0,
-    stack: [...initialStack],
-    steps: [initialStep],
-  };
-
-  // Walk one deterministic path to show some steps
-  let config = initialConfig;
-  let stepNum = 1;
-
-  while (stepNum < 20) {
-    const currentInput = config.inputPos >= input.length ? EPSILON : input[config.inputPos];
-    const stackTop = config.stack.length > 0 ? config.stack[config.stack.length - 1] : EPSILON;
-
-    const inputT = definition.transitions.find(t =>
-      t.currentState === config.state &&
-      t.inputSymbol === currentInput &&
-      currentInput !== EPSILON &&
-      (t.stackTop === stackTop || t.stackTop === EPSILON)
-    );
-
-    const epsT = definition.transitions.find(t =>
-      t.currentState === config.state &&
-      t.inputSymbol === EPSILON &&
-      (t.stackTop === stackTop || t.stackTop === EPSILON)
-    );
-
-    const matched = inputT
-      ? { transition: inputT, consumeInput: true }
-      : epsT
-      ? { transition: epsT, consumeInput: false }
-      : null;
-
-    if (!matched) break;
-
-    const newStack = applyStackOperation(config.stack, matched.transition);
-    const newInputPos = matched.consumeInput ? config.inputPos + 1 : config.inputPos;
-
-    const step: SimulationStep = {
-      stepNumber: stepNum,
-      currentState: matched.transition.nextState,
-      remainingInput: input.slice(newInputPos),
-      stackContents: [...newStack],
-      transitionApplied: matched.transition,
-      stackOperation: describeStackOp(matched.transition),
-    };
-
-    yield step;
-
-    config = {
-      state: matched.transition.nextState,
-      inputPos: newInputPos,
-      stack: newStack,
-      steps: [...config.steps, step],
-    };
-
-    stepNum++;
-  }
-
-  return {
-    accepted: false,
-    steps: config.steps,
-    reason: 'No accepting configuration found',
-  };
 }
