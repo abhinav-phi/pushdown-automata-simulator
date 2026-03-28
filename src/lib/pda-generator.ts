@@ -405,3 +405,240 @@ export function parseLanguageString(input: string): LanguageSpec | string {
 
   return { exponents, conditions };
 }
+// ============================================================
+// REGEX-BASED PDA GENERATION
+// ============================================================
+
+type RegexNode =
+  | { type: 'literal'; value: string }
+  | { type: 'concat'; left: RegexNode; right: RegexNode }
+  | { type: 'union'; left: RegexNode; right: RegexNode }
+  | { type: 'star'; child: RegexNode }
+  | { type: 'plus'; child: RegexNode }
+  | { type: 'epsilon' };
+
+// ---- Parser ----
+class RegexParser {
+  private pos = 0;
+  constructor(private input: string) {}
+
+  parse(): RegexNode {
+    const node = this.parseUnion();
+    if (this.pos < this.input.length)
+      throw new Error(`Unexpected character: ${this.input[this.pos]}`);
+    return node;
+  }
+
+  private parseUnion(): RegexNode {
+    let left = this.parseConcat();
+    while (this.pos < this.input.length && this.input[this.pos] === '|') {
+      this.pos++;
+      const right = this.parseConcat();
+      left = { type: 'union', left, right };
+    }
+    return left;
+  }
+
+  private parseConcat(): RegexNode {
+    let left = this.parseStar();
+    while (
+      this.pos < this.input.length &&
+      this.input[this.pos] !== ')' &&
+      this.input[this.pos] !== '|'
+    ) {
+      const right = this.parseStar();
+      left = { type: 'concat', left, right };
+    }
+    return left;
+  }
+
+  private parseStar(): RegexNode {
+    let node = this.parseAtom();
+    while (this.pos < this.input.length) {
+      if (this.input[this.pos] === '*') {
+        this.pos++;
+        node = { type: 'star', child: node };
+      } else if (this.input[this.pos] === '+') {
+        this.pos++;
+        node = { type: 'plus', child: node };
+      } else {
+        break;
+      }
+    }
+    return node;
+  }
+
+  private parseAtom(): RegexNode {
+    if (this.pos >= this.input.length)
+      throw new Error('Unexpected end of regex');
+
+    const ch = this.input[this.pos];
+
+    if (ch === '(') {
+      this.pos++;
+      const node = this.parseUnion();
+      if (this.input[this.pos] !== ')')
+        throw new Error('Missing closing )');
+      this.pos++;
+      return node;
+    }
+
+    if (ch === 'ε' || ch === 'e') {
+      this.pos++;
+      return { type: 'epsilon' };
+    }
+
+    if (ch !== ')' && ch !== '|' && ch !== '*' && ch !== '+') {
+      this.pos++;
+      return { type: 'literal', value: ch };
+    }
+
+    throw new Error(`Unexpected character: ${ch}`);
+  }
+}
+
+// ---- NFA State ----
+interface NFAState {
+  id: string;
+  transitions: { symbol: string | null; to: string }[]; // null = epsilon
+}
+
+let nfaCounter = 0;
+function newNFAState(): NFAState {
+  return { id: `n${nfaCounter++}`, transitions: [] };
+}
+
+interface NFAFragment {
+  start: NFAState;
+  accept: NFAState;
+  states: Map<string, NFAState>;
+}
+
+// ---- Thompson's Construction ----
+function buildNFA(node: RegexNode): NFAFragment {
+  const allStates = new Map<string, NFAState>();
+
+  const reg = (s: NFAState) => { allStates.set(s.id, s); return s; };
+
+  function build(n: RegexNode): { start: NFAState; accept: NFAState } {
+    switch (n.type) {
+      case 'epsilon': {
+        const s = reg(newNFAState());
+        const a = reg(newNFAState());
+        s.transitions.push({ symbol: null, to: a.id });
+        return { start: s, accept: a };
+      }
+      case 'literal': {
+        const s = reg(newNFAState());
+        const a = reg(newNFAState());
+        s.transitions.push({ symbol: n.value, to: a.id });
+        return { start: s, accept: a };
+      }
+      case 'concat': {
+        const left = build(n.left);
+        const right = build(n.right);
+        left.accept.transitions.push({ symbol: null, to: right.start.id });
+        return { start: left.start, accept: right.accept };
+      }
+      case 'union': {
+        const s = reg(newNFAState());
+        const a = reg(newNFAState());
+        const left = build(n.left);
+        const right = build(n.right);
+        s.transitions.push({ symbol: null, to: left.start.id });
+        s.transitions.push({ symbol: null, to: right.start.id });
+        left.accept.transitions.push({ symbol: null, to: a.id });
+        right.accept.transitions.push({ symbol: null, to: a.id });
+        return { start: s, accept: a };
+      }
+      case 'star': {
+        const s = reg(newNFAState());
+        const a = reg(newNFAState());
+        const child = build(n.child);
+        s.transitions.push({ symbol: null, to: child.start.id });
+        s.transitions.push({ symbol: null, to: a.id });
+        child.accept.transitions.push({ symbol: null, to: child.start.id });
+        child.accept.transitions.push({ symbol: null, to: a.id });
+        return { start: s, accept: a };
+      }
+      case 'plus': {
+        const child = build(n.child);
+        const s = reg(newNFAState());
+        const a = reg(newNFAState());
+        s.transitions.push({ symbol: null, to: child.start.id });
+        child.accept.transitions.push({ symbol: null, to: child.start.id });
+        child.accept.transitions.push({ symbol: null, to: a.id });
+        return { start: s, accept: a };
+      }
+    }
+  }
+
+  const { start, accept } = build(node);
+  return { start, accept, states: allStates };
+}
+
+// ---- NFA → PDADefinition ----
+export function generatePDAFromRegex(regexStr: string): PDADefinition | string {
+  // Reset NFA counter for clean state names
+  nfaCounter = 0;
+
+  const cleaned = regexStr.trim().replace(/\s+/g, '');
+  if (!cleaned) return 'Empty regex';
+
+  let ast: RegexNode;
+  try {
+    ast = new RegexParser(cleaned).parse();
+  } catch (e: any) {
+    return `Parse error: ${e.message}`;
+  }
+
+  const nfa = buildNFA(ast);
+
+  // Collect all input symbols
+  const inputAlphabetSet = new Set<string>();
+  for (const state of nfa.states.values()) {
+    for (const t of state.transitions) {
+      if (t.symbol !== null) inputAlphabetSet.add(t.symbol);
+    }
+  }
+
+  // Build PDA states from NFA states (1:1 mapping, stack is just Z always)
+  const pdaStates: string[] = [];
+  const pdaTransitions: ReturnType<typeof makeTransition>[] = [];
+
+  // Rename NFA states to q0, q1, ...
+  const nameMap = new Map<string, string>();
+  let qCounter = 0;
+  for (const id of nfa.states.keys()) {
+    nameMap.set(id, `q${qCounter++}`);
+  }
+
+  for (const id of nfa.states.keys()) {
+    pdaStates.push(nameMap.get(id)!);
+  }
+
+  for (const state of nfa.states.values()) {
+    const from = nameMap.get(state.id)!;
+    for (const t of state.transitions) {
+      const to = nameMap.get(t.to)!;
+      const sym = t.symbol ?? EPSILON;
+      // Stack: always keep Z (regular language — no stack needed)
+      pdaTransitions.push(makeTransition(from, sym, 'Z', to, 'Z'));
+    }
+  }
+
+  const initialState = nameMap.get(nfa.start.id)!;
+  const acceptState = nameMap.get(nfa.accept.id)!;
+
+  return {
+    states: pdaStates,
+    acceptStates: [acceptState],
+    initialState,
+    initialStackSymbol: 'Z',
+    inputAlphabet: [...inputAlphabetSet],
+    stackAlphabet: ['Z'],
+    acceptanceMode: 'finalState',
+    transitions: pdaTransitions,
+    languageDescription: `L = { ${regexStr} }`,
+  };
+}
