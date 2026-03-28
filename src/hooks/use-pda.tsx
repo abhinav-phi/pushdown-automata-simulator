@@ -6,7 +6,6 @@ import { simulatePDA, simulateStepByStep } from '@/lib/pda-engine';
 interface PDAContextType {
   definition: PDADefinition;
   setDefinition: React.Dispatch<React.SetStateAction<PDADefinition>>;
-  // Simulation
   simulationSteps: SimulationStep[];
   currentStepIndex: number;
   simulationResult: SimulationResult | null;
@@ -20,16 +19,12 @@ interface PDAContextType {
   resetSimulation: () => void;
   testInput: string;
   setTestInput: (s: string) => void;
-  // History
   history: HistoryEntry[];
   addHistory: (entry: HistoryEntry) => void;
   clearHistory: () => void;
-  // Quick test
   quickTest: (input: string) => SimulationResult;
-  // Preset
   loadPreset: (index: number) => void;
   currentPresetIndex: number;
-  // Theme
   isDark: boolean;
   toggleTheme: () => void;
 }
@@ -44,7 +39,6 @@ export function usePDA() {
 
 export function PDAProvider({ children }: { children: React.ReactNode }) {
   const [definition, setDefinition] = useState<PDADefinition>(() => {
-    // Try loading saved custom
     const saved = localStorage.getItem('pda-custom');
     if (saved) {
       try { return JSON.parse(saved); } catch {}
@@ -101,7 +95,7 @@ export function PDAProvider({ children }: { children: React.ReactNode }) {
     resetSimulationState();
     const result = simulatePDA(definition, input);
     allStepsRef.current = result.steps;
-    setSimulationSteps([result.steps[0]]);
+    setSimulationSteps(result.steps); // ✅ FIX: saare steps set karo
     setCurrentStepIndex(0);
     stepIdxRef.current = 0;
     setSimulationResult(null);
@@ -119,7 +113,7 @@ export function PDAProvider({ children }: { children: React.ReactNode }) {
     setTestInput(input);
     const result = simulatePDA(def, input);
     allStepsRef.current = result.steps;
-    setSimulationSteps([result.steps[0]]);
+    setSimulationSteps(result.steps); // ✅ FIX: saare steps set karo
     setCurrentStepIndex(0);
     stepIdxRef.current = 0;
     setSimulationResult(null);
@@ -147,7 +141,6 @@ export function PDAProvider({ children }: { children: React.ReactNode }) {
       }
       stepIdxRef.current = nextIdx;
       setCurrentStepIndex(nextIdx);
-      setSimulationSteps(allSteps.slice(0, nextIdx + 1));
       if (nextIdx === allSteps.length - 1) {
         setIsRunningAll(false);
         runAllRef.current = false;
@@ -165,7 +158,6 @@ export function PDAProvider({ children }: { children: React.ReactNode }) {
     const allSteps = allStepsRef.current;
     const nextIdx = stepIdxRef.current + 1;
     if (nextIdx >= allSteps.length) {
-      // Simulation complete
       const result = simulatePDA(definition, testInput);
       setSimulationResult(result);
       addHistory({ input: testInput, accepted: result.accepted, steps: result.steps.length });
@@ -173,7 +165,6 @@ export function PDAProvider({ children }: { children: React.ReactNode }) {
     }
     stepIdxRef.current = nextIdx;
     setCurrentStepIndex(nextIdx);
-    setSimulationSteps(allSteps.slice(0, nextIdx + 1));
 
     if (nextIdx === allSteps.length - 1) {
       const result = simulatePDA(definition, testInput);
@@ -200,7 +191,6 @@ export function PDAProvider({ children }: { children: React.ReactNode }) {
       }
       stepIdxRef.current = nextIdx;
       setCurrentStepIndex(nextIdx);
-      setSimulationSteps(allSteps.slice(0, nextIdx + 1));
 
       if (nextIdx === allSteps.length - 1) {
         setIsRunningAll(false);
