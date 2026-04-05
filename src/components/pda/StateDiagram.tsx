@@ -171,7 +171,7 @@ export default function StateDiagram() {
   return (
     <div className="panel h-full flex flex-col">
       <h2 className="panel-title">State Diagram</h2>
-      <div ref={containerRef} className="flex-1 min-h-[300px] rounded bg-secondary/30" />
+      <div ref={containerRef} className="flex-1 min-h-[200px] rounded bg-secondary/30" />
     </div>
   );
 }
