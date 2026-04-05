@@ -6,7 +6,7 @@ import {
   ExponentRow,
   ConditionRow,
   generatePDAFromLanguage,
-  generatePDAFromRegex,  
+  generatePDAFromRegex,
   generateSmallestString,
   buildLanguageDescription,
   parseLanguageString,
@@ -32,35 +32,9 @@ function autoCloseBracket(
     el.setSelectionRange(start + 1, start + 1);
   });
 }
-// function autoCloseBracket(
-//   e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>
-// ) {
-//   const pairs: Record<string, string> = { '(': ')', '[': ']', '{': '}' };
-//   const close = pairs[e.key];
-//   if (!close) return;
-//   e.preventDefault();
-//   const el = e.currentTarget;
-//   const start = el.selectionStart ?? 0;
-//   const end = el.selectionEnd ?? 0;
-//   const val = el.value;
-//   const newVal = val.slice(0, start) + e.key + close + val.slice(end);
-//   // Use native setter to trigger React's onChange
-//   const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-//     window.HTMLInputElement.prototype,
-//     'value'
-//   )?.set || Object.getOwnPropertyDescriptor(
-//     window.HTMLTextAreaElement.prototype,
-//     'value'
-//   )?.set;
-//   nativeInputValueSetter?.call(el, newVal);
-//   el.dispatchEvent(new Event('input', { bubbles: true }));
-//   requestAnimationFrame(() => {
-//     el.setSelectionRange(start + 1, start + 1);
-//   });
-// }
 
 export default function LanguageInputPanel() {
-  const { setDefinition, setTestInput, startAndRunAll } = usePDA();
+  const { setDefinition, setTestInput, startAndRunAll, acceptanceMode, setAcceptanceMode } = usePDA();
 
   const [exponents, setExponents] = useState<ExponentRow[]>([
     { symbol: 'a', variable: 'n', coefficient: 1 },
@@ -73,31 +47,28 @@ export default function LanguageInputPanel() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const addExponent = () => {
+  const addExponent = () =>
     setExponents(prev => [...prev, { symbol: '', variable: '', coefficient: 1 }]);
-  };
 
-  const removeExponent = (i: number) => {
+  const removeExponent = (i: number) =>
     setExponents(prev => prev.filter((_, idx) => idx !== i));
-  };
 
-  const updateExponent = (i: number, field: keyof ExponentRow, value: string | number) => {
-    setExponents(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: value } : e));
-  };
+  const updateExponent = (i: number, field: keyof ExponentRow, value: string | number) =>
+    setExponents(prev => prev.map((e, idx) => (idx === i ? { ...e, [field]: value } : e)));
 
-  const addCondition = () => {
+  const addCondition = () =>
     setConditions(prev => [...prev, { variable: '', operator: '≥' as const, value: 1 }]);
-  };
 
-  const removeCondition = (i: number) => {
+  const removeCondition = (i: number) =>
     setConditions(prev => prev.filter((_, idx) => idx !== i));
-  };
 
-  const updateCondition = (i: number, field: keyof ConditionRow, value: string | number) => {
-    setConditions(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c));
-  };
+  const updateCondition = (i: number, field: keyof ConditionRow, value: string | number) =>
+    setConditions(prev => prev.map((c, idx) => (idx === i ? { ...c, [field]: value } : c)));
 
-  const preview = buildLanguageDescription(exponents.filter(e => e.symbol && e.variable), conditions);
+  const preview = buildLanguageDescription(
+    exponents.filter(e => e.symbol && e.variable),
+    conditions
+  );
 
   const handleGenerate = useCallback(() => {
     setError(null);
@@ -109,95 +80,99 @@ export default function LanguageInputPanel() {
       return;
     }
 
-    const result = generatePDAFromLanguage({
-      exponents: validExponents,
-      conditions: conditions.filter(c => c.variable),
-    });
+    const spec = { exponents: validExponents, conditions: conditions.filter(c => c.variable) };
+    const result = generatePDAFromLanguage(spec, acceptanceMode);
 
     if (typeof result === 'string') {
       setError(result);
     } else {
-      setDefinition(result);
+      // Inject current acceptance mode into the generated definition
+      const defWithMode = { ...result, acceptanceMode };
+      setDefinition(defWithMode);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      const spec = { exponents: validExponents, conditions: conditions.filter(c => c.variable) };
       const smallest = generateSmallestString(spec);
       if (smallest) {
         setTestInput(smallest);
-        startAndRunAll(smallest, result);
+        startAndRunAll(smallest, defWithMode);
       }
     }
-  }, [exponents, conditions, setDefinition, setTestInput, startAndRunAll]);
+  }, [exponents, conditions, acceptanceMode, setDefinition, setTestInput, startAndRunAll]);
 
-  // const handleRegexGenerate = useCallback(() => {
-  //   setError(null);
-  //   setSuccess(false);
-
-  //   const parsed = parseLanguageString(regexInput);
-  //   if (typeof parsed === 'string') {
-  //     setError(parsed);
-  //     return;
-  //   }
-
-  //   const result = generatePDAFromLanguage(parsed);
-  //   if (typeof result === 'string') {
-  //     setError(result);
-  //   } else {
-  //     setDefinition(result);
-  //     setExponents(parsed.exponents);
-  //     setConditions(parsed.conditions);
-  //     setSuccess(true);
-  //     setTimeout(() => setSuccess(false), 2000);
-  //     const smallest = generateSmallestString(parsed);
-  //     if (smallest) {
-  //       setTestInput(smallest);
-  //       startAndRunAll(smallest, result);
-  //     }
-  //   }
-  // }, [regexInput, setDefinition, setTestInput, startAndRunAll]);
   const handleRegexGenerate = useCallback(() => {
-  setError(null);
-  setSuccess(false);
+    setError(null);
+    setSuccess(false);
 
-  if (!regexInput.trim()) {
-    setError('Enter a regex pattern');
-    return;
-  }
+    if (!regexInput.trim()) {
+      setError('Enter a regex pattern');
+      return;
+    }
 
-  // Pehle try karo exponent pattern (a^n b^n style)
-  const parsed = parseLanguageString(regexInput);
-  if (typeof parsed !== 'string') {
-    // Exponent pattern mila
-    const result = generatePDAFromLanguage(parsed);
-    if (typeof result === 'string') {
-      setError(result);
+    // Try exponent pattern first (a^n b^n style)
+    const parsed = parseLanguageString(regexInput);
+    if (typeof parsed !== 'string') {
+      const result = generatePDAFromLanguage(parsed, acceptanceMode);
+      if (typeof result === 'string') {
+        setError(result);
+      } else {
+        const defWithMode = { ...result, acceptanceMode };
+        setDefinition(defWithMode);
+        setExponents(parsed.exponents);
+        setConditions(parsed.conditions);
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 2000);
+        const smallest = generateSmallestString(parsed);
+        if (smallest) {
+          setTestInput(smallest);
+          startAndRunAll(smallest, defWithMode);
+        }
+      }
+      return;
+    }
+
+    // Fall back to regex NFA→PDA generation
+    const result = generatePDAFromRegex(regexInput, undefined, acceptanceMode);
+    if ('error' in result) {
+      setError(result.error);
     } else {
-      setDefinition(result);
-      setExponents(parsed.exponents);
-      setConditions(parsed.conditions);
+      const defWithMode = { ...result.pda, acceptanceMode };
+      setDefinition(defWithMode);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 2000);
-      const smallest = generateSmallestString(parsed);
-      if (smallest) {
-        setTestInput(smallest);
-        startAndRunAll(smallest, result);
-      }
+      setTestInput('');
     }
-    return;
-  }
+  }, [regexInput, acceptanceMode, setDefinition, setTestInput, startAndRunAll]);
 
-  // Exponent pattern nahi mila — try regex (a+b)*c style
-  const result = generatePDAFromRegex(regexInput);
-  if (typeof result === 'string') {
-    setError(result);
-  } else {
-    setDefinition(result);
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 2000);
-    // Regex ke liye test input manually set karo
-    setTestInput('');
-  }
-}, [regexInput, setDefinition, setTestInput, startAndRunAll]);
+  // ─── Acceptance Mode Toggle (shared between both tabs) ───────────────────
+  const AcceptanceModeToggle = () => (
+    <div className="flex items-center gap-2 pt-1">
+      <span className="text-xs text-muted-foreground font-medium shrink-0">Accept by:</span>
+      <div className="flex rounded overflow-hidden border border-border text-xs">
+        <button
+          type="button"
+          onClick={() => setAcceptanceMode('finalState')}
+          className={`px-2.5 py-1 transition-colors ${
+            acceptanceMode === 'finalState'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+          }`}
+        >
+          Final State
+        </button>
+        <button
+          type="button"
+          onClick={() => setAcceptanceMode('emptyStack')}
+          className={`px-2.5 py-1 transition-colors border-l border-border ${
+            acceptanceMode === 'emptyStack'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+          }`}
+        >
+          Empty Stack
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="panel">
@@ -209,11 +184,12 @@ export default function LanguageInputPanel() {
           <TabsTrigger value="regex" className="text-xs">REGEX</TabsTrigger>
         </TabsList>
 
+        {/* ── LANG tab ── */}
         <TabsContent value="lang" className="mt-2 space-y-3">
           {/* Exponents */}
           <div>
             <label className="text-xs text-muted-foreground font-medium mb-1 block">
-              Symbols & Exponents
+              Symbols &amp; Exponents
             </label>
             <div className="space-y-1.5">
               {exponents.map((exp, i) => (
@@ -221,8 +197,9 @@ export default function LanguageInputPanel() {
                   <input
                     value={exp.symbol}
                     onChange={e => updateExponent(i, 'symbol', e.target.value)}
-                    // onKeyDown={autoCloseBracket}
-                    onKeyDown={e => autoCloseBracket(e, (val) => updateExponent(i, 'symbol', val), exp.symbol)}
+                    onKeyDown={e =>
+                      autoCloseBracket(e, val => updateExponent(i, 'symbol', val), exp.symbol)
+                    }
                     placeholder="a"
                     className="w-10 h-7 text-xs text-center rounded border border-input bg-background text-foreground font-mono px-1"
                   />
@@ -309,14 +286,18 @@ export default function LanguageInputPanel() {
             </div>
           )}
 
+          {/* Acceptance mode — above Generate button */}
+          <AcceptanceModeToggle />
+
           <button
             onClick={handleGenerate}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-           Generate PDA
+            Generate PDA
           </button>
         </TabsContent>
 
+        {/* ── REGEX tab ── */}
         <TabsContent value="regex" className="mt-2 space-y-3">
           <div>
             <label className="text-xs text-muted-foreground font-medium mb-1 block">
@@ -325,18 +306,20 @@ export default function LanguageInputPanel() {
             <textarea
               value={regexInput}
               onChange={e => setRegexInput(e.target.value)}
-              // onKeyDown={autoCloseBracket as any}
               onKeyDown={e => autoCloseBracket(e, setRegexInput, regexInput)}
               placeholder="e.g. a^n b^{2n} or aⁿb²ⁿ"
               className="w-full h-16 text-xs rounded border border-input bg-background text-foreground font-mono p-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring"
             />
           </div>
 
+          {/* Acceptance mode — above Generate button */}
+          <AcceptanceModeToggle />
+
           <button
             onClick={handleRegexGenerate}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-           Generate PDA
+            Generate PDA
           </button>
         </TabsContent>
       </Tabs>
