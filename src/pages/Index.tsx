@@ -3,7 +3,7 @@ import { PDAProvider } from '@/hooks/use-pda';
 import Header from '@/components/pda/Header';
 import LanguageInputPanel from '@/components/pda/LanguageInputPanel';
 import PDADefinitionPanel from '@/components/pda/PDADefinitionPanel';
-import TransitionTable from '@/components/pda/TransitionTable';
+import EditableTransitionTable from '@/components/pda/EditableTransitionTable';
 import StateDiagram from '@/components/pda/StateDiagram';
 import StackVisualizer from '@/components/pda/StackVisualizer';
 import SimulationControls from '@/components/pda/SimulationControls';
@@ -19,26 +19,27 @@ function PDAApp() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header onShowHistory={() => setShowHistory(true)} />
 
-      <div className="flex-1 grid grid-cols-[280px_1fr] gap-2 p-2 overflow-hidden h-[calc(100vh-57px)]">
+      <div className="flex-1 grid grid-cols-[300px_1fr] gap-2 p-2 overflow-hidden h-[calc(100vh-57px)]">
 
         {/* Left Column */}
         <div className="flex flex-col gap-2 overflow-auto">
           <LanguageInputPanel />
-          <TransitionTable />
-          <PDADefinitionPanel />
+          {/* Editable Transition Table replaces static TransitionTable */}
+          <EditableTransitionTable />
+          {/* <PDADefinitionPanel /> */}
           <InputTestingPanel />
         </div>
 
         {/* Right Side */}
         <div className="flex flex-col gap-2 overflow-hidden">
 
-          {/* State Diagram — top, bada */}
+          {/* State Diagram — top */}
           <div className="h-[300px]">
             <StateDiagram />
           </div>
 
           {/* Bottom Row — Stack, Simulation, Log */}
-          <div className="grid grid-cols-3 gap-2 h-[320px]">
+          <div className="grid grid-cols-3 gap-2 h-[320px] shrink-0">
             <StackVisualizer />
             <SimulationControls />
             <ExecutionLog />
