@@ -161,7 +161,23 @@ export default function EditableTransitionTable() {
 
   // ─── Apply to PDA ("Update PDA") ─────────────────────────────────────────
   const applyToPDA = useCallback(() => {
-    const currentRows = rowsRef.current;
+    let currentRows = rowsRef.current;
+
+    // If there is an active edit, commit it first
+    if (editingIdx !== null && editBuf !== null) {
+      const err = validateTransition(editBuf, definition);
+      if (err) {
+        setErrors(prev => ({ ...prev, [editingIdx]: err }));
+        setGlobalError(`Row ${editingIdx + 1}: ${err}`);
+        return;
+      }
+      currentRows = currentRows.map((r, i) =>
+        i === editingIdx ? { ...r, ...editBuf, _dirty: true } : r
+      );
+      setRows(currentRows);
+      setEditingIdx(null);
+      setEditBuf(null);
+    }
 
     // Validate all rows against current definition
     for (let i = 0; i < currentRows.length; i++) {
@@ -187,7 +203,7 @@ export default function EditableTransitionTable() {
 
     setUpdateSuccess(true);
     setTimeout(() => setUpdateSuccess(false), 2000);
-  }, [definition, setDefinition, resetSimulation]);
+  }, [definition, setDefinition, resetSimulation, editingIdx, editBuf]);
   // NOTE: `rows` deliberately NOT in deps — we read it via rowsRef to avoid
   // a stale closure when the user clicks Update immediately after an edit.
 
@@ -203,12 +219,15 @@ export default function EditableTransitionTable() {
     onChange: (v: string) => void;
     type?: 'state' | 'stackSym' | 'inputSym' | 'stackOp' | 'text';
   }) => {
+    const baseClass = "w-full min-w-0 h-6 text-[11px] px-1 rounded border border-primary/40 bg-background text-foreground font-mono focus:outline-none focus:ring-1 focus:ring-primary";
+    const selectClass = `${baseClass} appearance-none cursor-pointer`;
+
     if (type === 'state') {
       return (
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="w-16 h-6 text-[11px] px-1 rounded border border-primary/40 bg-background text-foreground font-mono"
+          className={selectClass}
         >
           {states.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -219,7 +238,7 @@ export default function EditableTransitionTable() {
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="w-14 h-6 text-[11px] px-1 rounded border border-primary/40 bg-background text-foreground font-mono"
+          className={selectClass}
         >
           {stackAlphabet.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -230,7 +249,7 @@ export default function EditableTransitionTable() {
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="w-14 h-6 text-[11px] px-1 rounded border border-primary/40 bg-background text-foreground font-mono"
+          className={selectClass}
         >
           <option value={EPSILON}>ε</option>
           {inputAlphabet.map(s => <option key={s} value={s}>{s}</option>)}
@@ -242,8 +261,8 @@ export default function EditableTransitionTable() {
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder="e.g. AZ or ε"
-        className="w-16 h-6 text-[11px] px-1 rounded border border-primary/40 bg-background text-foreground font-mono"
+        placeholder="Op"
+        className={baseClass}
       />
     );
   };
@@ -302,17 +321,17 @@ export default function EditableTransitionTable() {
       )}
 
       <div className="w-full overflow-hidden">
-        <table className="w-full text-xs font-mono border-collapse">
+        <table className="w-full text-xs font-mono border-collapse table-fixed">
           <thead>
             <tr className="text-muted-foreground border-b border-border">
-              <th className="text-left py-1.5 px-1 w-6">#</th>
+              <th className="text-left py-1.5 px-1 w-[44px]">#</th>
               <th className="text-left py-1.5 px-1">From</th>
               <th className="text-left py-1.5 px-1">In</th>
               <th className="text-left py-1.5 px-1">Top</th>
-              <th className="text-center py-1.5 px-1 text-muted-foreground/50">→</th>
+              <th className="text-center py-1.5 px-1 w-4 text-muted-foreground/50">→</th>
               <th className="text-left py-1.5 px-1">To</th>
               <th className="text-left py-1.5 px-1">Op</th>
-              <th className="text-right py-1.5 px-1 w-20">Actions</th>
+              <th className="text-right py-1.5 px-1 w-[90px]">Actions</th>
             </tr>
           </thead>
           <tbody>

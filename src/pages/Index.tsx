@@ -19,7 +19,7 @@ function PDAApp() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header onShowHistory={() => setShowHistory(true)} />
 
-      <div className="flex-1 grid grid-cols-[300px_1fr] gap-2 p-2 overflow-hidden h-[calc(100vh-57px)]">
+      <div className="flex-1 grid grid-cols-[350px_1fr] gap-2 p-2 overflow-hidden h-[calc(100vh-57px)]">
 
         {/* Left Column */}
         <div className="flex flex-col gap-2 overflow-auto">
