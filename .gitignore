@@ -23,3 +23,4 @@ dist-ssr
 *.sln
 *.sw?
 remove_comments.py
+user_guide.pdf

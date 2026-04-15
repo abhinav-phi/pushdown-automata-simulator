@@ -179,9 +179,9 @@ export default function LanguageInputPanel() {
       <div className="panel-title">Language Input</div>
 
       <Tabs defaultValue="lang" className="w-full">
-        <TabsList className="w-full grid grid-cols-2 h-8">
+        <TabsList className="w-full grid grid-cols-1 h-8">
           <TabsTrigger value="lang" className="text-xs">LANG</TabsTrigger>
-          <TabsTrigger value="regex" className="text-xs">REGEX</TabsTrigger>
+          {/* <TabsTrigger value="regex" className="text-xs">REGEX</TabsTrigger> */}
         </TabsList>
 
         {/* ── LANG tab ── */}
