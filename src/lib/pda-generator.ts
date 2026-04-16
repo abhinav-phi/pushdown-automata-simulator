@@ -291,7 +291,160 @@ export function parseLanguageString(input: string): LanguageSpec | string {
 }
 
 // ─────────────────────────────────────────────────────────────
-// generatePDAFromRegex  — REMOVED (see regex-engine.ts)
-// Kept as a thin shim so old imports don't break
+// generatePDAFromRegex  — thin shim so old imports don't break
 // ─────────────────────────────────────────────────────────────
 export { regexToPDA as generatePDAFromRegex } from './regex-engine';
+
+// ─────────────────────────────────────────────────────────────
+// generateParenthesisPDA
+// Accepts any user-defined bracket pairs, e.g. ()[]{}  or  <> «»
+// ─────────────────────────────────────────────────────────────
+export function generateParenthesisPDA(pairs: [string, string][], mode: 'finalState' | 'emptyStack'): PDADefinition | string {
+  if (pairs.length === 0) return 'Add at least one bracket pair';
+
+  const validPairs = pairs.filter(p => p[0] && p[1]);
+  if (validPairs.length === 0) return 'Add at least one complete bracket pair';
+
+  // Validate no conflicts
+  const opens = validPairs.map(p => p[0]);
+  const closes = validPairs.map(p => p[1]);
+  const openSet = new Set(opens);
+  const closeSet = new Set(closes);
+
+  for (const c of closes) {
+    if (openSet.has(c)) return `Character "${c}" is used as both an opening and closing bracket`;
+  }
+
+  const states = ['q0', 'q1'];
+  const acceptStates = ['q1'];
+  const initialState = 'q0';
+  const initialStackSymbol = 'Z';
+
+  // Input alphabet = all open + close chars
+  const inputAlphabet = Array.from(new Set([...opens, ...closes]));
+
+  // Stack alphabet = Z + all opening brackets (we push the open bracket as stack marker)
+  const stackAlphabet = ['Z', ...opens];
+  const transitions: ReturnType<typeof makeTransition>[] = [];
+
+  for (let i = 0; i < validPairs.length; i++) {
+    const [left, right] = validPairs[i];
+
+    // Push opening bracket onto Z
+    transitions.push(makeTransition('q0', left, 'Z', 'q0', `${left}Z`));
+
+    // Push opening bracket onto any other opening bracket already in stack
+    for (let j = 0; j < validPairs.length; j++) {
+      const existingOpen = validPairs[j][0];
+      transitions.push(makeTransition('q0', left, existingOpen, 'q0', `${left}${existingOpen}`));
+    }
+
+    // Pop on matching close bracket only (correct matching)
+    transitions.push(makeTransition('q0', right, left, 'q0', EPSILON));
+
+    // For mismatched closes → no transition = rejection (no need to add error transitions)
+  }
+
+  // Move to accept state when stack has only Z (all brackets matched)
+  if (mode === 'emptyStack') {
+    transitions.push(makeTransition('q0', EPSILON, 'Z', 'q1', EPSILON));
+  } else {
+    transitions.push(makeTransition('q0', EPSILON, 'Z', 'q1', 'Z'));
+  }
+
+  const pairStr = validPairs.map(p => `${p[0]}${p[1]}`).join(', ');
+  return {
+    states,
+    acceptStates,
+    initialState,
+    initialStackSymbol,
+    inputAlphabet,
+    stackAlphabet,
+    acceptanceMode: mode,
+    transitions,
+    languageDescription: `L = { balanced ${pairStr} }`,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// generatePalindromePDA
+//
+// Recognises L = { w wᴿ | w ∈ Σ⁺ }  (even-length palindromes)
+// AND        L = { w c wᴿ | w ∈ Σ*, c ∈ Σ }  (odd-length palindromes)
+// via nondeterminism:
+//
+//  q0 (push phase):
+//    • For each a ∈ Σ: read a, push a onto stack (stay in q0)
+//    • Nondeterministically guess midpoint:
+//        ε-transition to q1  (even: no middle char consumed)
+//        For each a ∈ Σ: read a (skip middle char), ε to q1 (odd)
+//
+//  q1 (pop/match phase):
+//    • For each a ∈ Σ: read a, pop a from stack (match)
+//
+//  q2 (accept):
+//    • ε-transition from q1 when stack top = Z
+// ─────────────────────────────────────────────────────────────
+export function generatePalindromePDA(alphabet: string[], mode: 'finalState' | 'emptyStack'): PDADefinition | string {
+  if (alphabet.length === 0) return 'Add at least one alphabet symbol';
+  for (const a of alphabet) if (!a) return 'Alphabet symbol cannot be empty';
+
+  const states = ['q0', 'q1', 'q2'];
+  const acceptStates = ['q2'];
+  const initialState = 'q0';
+  const initialStackSymbol = 'Z';
+  const inputAlphabet = [...alphabet];
+  // Stack uses the alphabet chars themselves as stack symbols, plus Z
+  const stackAlphabet = ['Z', ...alphabet];
+  const transitions: ReturnType<typeof makeTransition>[] = [];
+
+  // ── q0: push phase ──
+  for (const a of alphabet) {
+    // Push a onto Z
+    transitions.push(makeTransition('q0', a, 'Z', 'q0', `${a}Z`));
+    // Push a onto any alphabet symbol already on stack
+    for (const b of alphabet) {
+      transitions.push(makeTransition('q0', a, b, 'q0', `${a}${b}`));
+    }
+  }
+
+  // ── Nondeterministic midpoint guess ──
+  // Even-length palindrome: guess midpoint WITHOUT consuming any input
+  for (const stackSym of stackAlphabet) {
+    transitions.push(makeTransition('q0', EPSILON, stackSym, 'q1', stackSym));
+  }
+
+  // Odd-length palindrome: consume middle character (any symbol), don't push it
+  for (const a of alphabet) {
+    // Middle char consumed, stack untouched — transition to q1
+    transitions.push(makeTransition('q0', a, 'Z', 'q1', 'Z'));
+    for (const b of alphabet) {
+      transitions.push(makeTransition('q0', a, b, 'q1', b));
+    }
+  }
+
+  // ── q1: pop/match phase ──
+  // Read a, pop matching a from stack
+  for (const a of alphabet) {
+    transitions.push(makeTransition('q1', a, a, 'q1', EPSILON));
+  }
+
+  // ── Accept from q1 when stack is empty (only Z remains) ──
+  if (mode === 'emptyStack') {
+    transitions.push(makeTransition('q1', EPSILON, 'Z', 'q2', EPSILON));
+  } else {
+    transitions.push(makeTransition('q1', EPSILON, 'Z', 'q2', 'Z'));
+  }
+
+  return {
+    states,
+    acceptStates,
+    initialState,
+    initialStackSymbol,
+    inputAlphabet,
+    stackAlphabet,
+    acceptanceMode: mode,
+    transitions,
+    languageDescription: `L = { wwᴿ | w ∈ {${alphabet.join(',')}}⁺ }`,
+  };
+}
